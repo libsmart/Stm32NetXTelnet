@@ -7,4 +7,5 @@
 #include "../Lib/Stm32Common/src/libsmart_config.dist.hpp"
 #include "../Lib/Stm32ItmLogger/src/libsmart_config.dist.hpp"
 #include "../Lib/Stm32ThreadX/src/libsmart_config.dist.hpp"
+#include "../Lib/Stm32NetX/src/libsmart_config.dist.hpp"
 

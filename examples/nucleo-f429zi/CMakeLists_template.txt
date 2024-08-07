@@ -54,6 +54,7 @@ include_directories(${includes}
     Lib/Stm32Common/src
     Lib/Stm32ItmLogger/src
     Lib/Stm32ThreadX/src
+    Lib/Stm32NetX/src
 )
 
 add_definitions(${defines})
@@ -64,6 +65,7 @@ file(GLOB_RECURSE SOURCES ${sources}
     "Lib/Stm32Common/src/*.*"
     "Lib/Stm32ItmLogger/src/*.*"
     "Lib/Stm32ThreadX/src/*.*"
+    "Lib/Stm32NetX/src/*.*"
 )
 
 set(LINKER_SCRIPT $${CMAKE_SOURCE_DIR}/${linkerScript})

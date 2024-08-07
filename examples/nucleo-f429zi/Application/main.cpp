@@ -10,8 +10,11 @@
  */
 
 #include "main.hpp"
+
+#include "eth.h"
 #include "globals.hpp"
 #include "RunEvery.hpp"
+#include "Stm32NetX.hpp"
 
 
 /**
@@ -36,13 +39,11 @@ void loopOnce() {
     tx_thread_stack_error_notify(Stack_Error_Handler);
 #endif
 
-    /*
     static char hostname[] = FIRMWARE_NAME"-000000";
     snprintf(hostname, sizeof(hostname), FIRMWARE_NAME"-%02X%02X%02X",
              heth.Init.MACAddr[3], heth.Init.MACAddr[4], heth.Init.MACAddr[5]);
     Stm32NetX::NX->getConfig()->hostname = hostname;
     Stm32NetX::NX->begin();
-    */
 
 }
 

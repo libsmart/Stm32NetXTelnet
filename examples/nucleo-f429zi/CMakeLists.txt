@@ -49,22 +49,24 @@ else ()
     add_compile_options(-Og -g)
 endif ()
 
-include_directories(Core/Inc Drivers/STM32F4xx_HAL_Driver/Inc Drivers/STM32F4xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32F4xx/Include Drivers/CMSIS/Include AZURE_RTOS/App Middlewares/ST/threadx/common/inc/ Middlewares/ST/threadx/ports/cortex_m4/gnu/inc/
+include_directories(Core/Inc Drivers/STM32F4xx_HAL_Driver/Inc Drivers/STM32F4xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32F4xx/Include Drivers/CMSIS/Include AZURE_RTOS/App Middlewares/ST/threadx/common/inc/ Middlewares/ST/threadx/ports/cortex_m4/gnu/inc/ NetXDuo/App NetXDuo/Target Drivers/BSP/Components/lan8742/ Middlewares/ST/netxduo/addons/dhcp/ Middlewares/ST/netxduo/common/inc/ Middlewares/ST/netxduo/ports/cortex_m4/gnu/inc/ Middlewares/ST/netxduo/common/drivers/ethernet/
     Application
     ../../src
     Lib/Stm32Common/src
     Lib/Stm32ItmLogger/src
     Lib/Stm32ThreadX/src
+    Lib/Stm32NetX/src
 )
 
-add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32F429xx -DTX_INCLUDE_USER_DEFINE_FILE)
+add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32F429xx -DTX_INCLUDE_USER_DEFINE_FILE -DNX_INCLUDE_USER_DEFINE_FILE)
 
-file(GLOB_RECURSE SOURCES "AZURE_RTOS/*.*" "Core/*.*" "Middlewares/*.*" "Drivers/*.*"
+file(GLOB_RECURSE SOURCES "AZURE_RTOS/*.*" "NetXDuo/*.*" "Core/*.*" "Middlewares/*.*" "Drivers/*.*"
     "Application/*.*"
     "../../src/*.*"
     "Lib/Stm32Common/src/*.*"
     "Lib/Stm32ItmLogger/src/*.*"
     "Lib/Stm32ThreadX/src/*.*"
+    "Lib/Stm32NetX/src/*.*"
 )
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32F429ZITX_FLASH.ld)

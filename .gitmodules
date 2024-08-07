@@ -7,3 +7,6 @@
 [submodule "examples/nucleo-f429zi/Lib/Stm32ItmLogger"]
 	path = examples/nucleo-f429zi/Lib/Stm32ItmLogger
 	url = https://github.com/libsmart/Stm32ItmLogger.git
+[submodule "examples/nucleo-f429zi/Lib/Stm32NetX"]
+	path = examples/nucleo-f429zi/Lib/Stm32NetX
+	url = https://github.com/libsmart/Stm32NetX.git
