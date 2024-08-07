@@ -25,14 +25,16 @@ void setup() {
 
     dummyCpp = 0;
     dummyCandCpp = 0;
-
-    tx_thread_stack_error_notify(Stack_Error_Handler);
 }
 
 
 void loopOnce() {
     Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
             ->println("::loopOnce()");
+
+#ifdef TX_ENABLE_STACK_CHECKING
+    tx_thread_stack_error_notify(Stack_Error_Handler);
+#endif
 
     /*
     static char hostname[] = FIRMWARE_NAME"-000000";

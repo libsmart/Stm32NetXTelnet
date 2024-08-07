@@ -52,6 +52,8 @@ _Noreturn static VOID mainLoopThread(ULONG initial_input) {
 
     loopOnce();
 
+    Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
+            ->println("::loop()");
     while (true) {
         if (mainThreadFlags.isSet(static_cast<ULONG>(mainThreadFlagsEnum::IS_RUNNING))) {
             loop();
