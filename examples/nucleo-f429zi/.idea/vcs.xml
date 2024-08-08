@@ -3,5 +3,8 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/../.." vcs="Git" />
     <mapping directory="$PROJECT_DIR$/Lib/Stm32Common" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Lib/Stm32ItmLogger" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Lib/Stm32NetX" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Lib/Stm32ThreadX" vcs="Git" />
   </component>
 </project>
