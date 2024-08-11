@@ -11,11 +11,14 @@
 #include "Nameable.hpp"
 #include "nx_api.h"
 #include "netxduo/addons/telnet/nxd_telnet_server.h"
-#include "LogicalConnection.hpp"
+#include "LogicalConnectionMicrorl.hpp"
+#include "StreamRxTx.hpp"
 
 namespace Stm32NetXTelnet {
     class Server : protected NX_TELNET_SERVER, public Stm32ItmLogger::Loggable, public Stm32Common::Nameable {
     public:
+        using logicalConnection_t = LogicalConnectionMicrorl;
+
         Server() : NX_TELNET_SERVER() {
             self = this;
         }
@@ -73,7 +76,7 @@ namespace Stm32NetXTelnet {
 
     private:
         inline static Server *self{};
-        LogicalConnection *logicalConnection[LIBSMART_STM32NETXTELNET_SERVER_MAX_CONNECTIONS]{};
+        logicalConnection_t *logicalConnection[LIBSMART_STM32NETXTELNET_SERVER_MAX_CONNECTIONS]{};
     };
 }
 

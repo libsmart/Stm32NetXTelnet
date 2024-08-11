@@ -6,7 +6,7 @@
 #include "Server.hpp"
 #include "LogicalConnection.hpp"
 #include "Stm32NetX.hpp"
-#include "Stm32ThreadX.hpp"
+#include "StreamRxTx.hpp"
 
 UINT Stm32NetXTelnet::Server::create(CHAR *server_name, NX_IP *ip_ptr, void *stack_ptr, ULONG stack_size,
                                      void (*new_connection)(NX_TELNET_SERVER_STRUCT *telnet_server_ptr,
@@ -52,15 +52,24 @@ void Stm32NetXTelnet::Server::new_connection(NX_TELNET_SERVER_STRUCT *telnet_ser
     Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
             ->println("Stm32NetXTelnet::Server::new_connection()");
 
-    Stm32ItmLogger::logger.printf("new logical_connection = %d\r\n", logical_connection);
+    Stm32ItmLogger::logger.printf("new logical_connection %d\r\n", logical_connection);
     if (self->logicalConnection[logical_connection] != nullptr) {
         Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::ERROR)
                 ->printf("slot self->logicalConnection[%d] not ready\r\n", logical_connection);
+        self->logicalConnection[logical_connection]->flush();
         self->disconnect(logical_connection);
+        delete self->logicalConnection[logical_connection];
+        self->logicalConnection[logical_connection] == nullptr;
         return;
     }
 
-    self->logicalConnection[logical_connection] = new LogicalConnection;
+    self->logicalConnection[logical_connection] = new logicalConnection_t;
+    char name[25]{};
+    snprintf(name, sizeof(name), "Telnet Session %d", logical_connection);
+
+    self->logicalConnection[logical_connection]->setName(name);
+    self->logicalConnection[logical_connection]->setLogger(self->getLogger());
+    self->logicalConnection[logical_connection]->setup();
 }
 
 void Stm32NetXTelnet::Server::receive_data(NX_TELNET_SERVER_STRUCT *telnet_server_ptr, UINT logical_connection,
@@ -68,17 +77,22 @@ void Stm32NetXTelnet::Server::receive_data(NX_TELNET_SERVER_STRUCT *telnet_serve
     // Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
     // ->println("Stm32NetXTelnet::Server::receive_data()");
 
-    LogicalConnection *conn = self->logicalConnection[logical_connection];
+    if(self == nullptr) {
+        nx_packet_release(packet_ptr);
+        return;
+    }
+
+    auto *conn = self->logicalConnection[logical_connection];
 
     // static char buffer[ETH_MAX_PAYLOAD];
     // std::memset(buffer, 0, sizeof(buffer));
     ULONG length = 0;
     ULONG bytes_copied = 0;
     nx_packet_length_get(packet_ptr, &length);
-    if (length <= conn->rxBuffer.availableForWrite()) {
-        auto ret = nx_packet_data_retrieve(packet_ptr, conn->rxBuffer.getWritePointer(), &bytes_copied);
+    if (length <= conn->getRxBuffer()->availableForWrite()) {
+        auto ret = nx_packet_data_retrieve(packet_ptr, conn->getRxBuffer()->getWritePointer(), &bytes_copied);
         if (ret == NX_SUCCESS) {
-            conn->rxBuffer.setWrittenBytes(bytes_copied);
+            conn->getRxBuffer()->setWrittenBytes(bytes_copied);
         }
     }
 
@@ -91,6 +105,7 @@ void Stm32NetXTelnet::Server::connection_end(NX_TELNET_SERVER_STRUCT *telnet_ser
 
     if (self->logicalConnection[logical_connection] != nullptr) {
         self->logicalConnection[logical_connection]->flush();
+        delete self->logicalConnection[logical_connection];
         self->logicalConnection[logical_connection] == nullptr;
     }
 }
@@ -226,11 +241,11 @@ void Stm32NetXTelnet::Server::loop() {
     // check, if there are bytes to write
     for (size_t i = 0; i < std::size(logicalConnection); i++) {
         if (logicalConnection[i] != nullptr) {
-            if (logicalConnection[i]->txBuffer.available() > 0) {
-                auto szBuffer = logicalConnection[i]->txBuffer.available();
-                auto ret = bufferSend(i, (void *) logicalConnection[i]->txBuffer.getReadPointer(), szBuffer, 100);
+            if (logicalConnection[i]->getTxBuffer()->available() > 0) {
+                auto szBuffer = logicalConnection[i]->getTxBuffer()->available();
+                auto ret = bufferSend(i, (void *) logicalConnection[i]->getTxBuffer()->getReadPointer(), szBuffer, 100);
                 if (ret == NX_SUCCESS) {
-                    logicalConnection[i]->txBuffer.remove(szBuffer);
+                    logicalConnection[i]->getTxBuffer()->remove(szBuffer);
                 }
             }
         }

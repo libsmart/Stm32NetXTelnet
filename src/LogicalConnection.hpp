@@ -7,6 +7,7 @@
 #define LIBSMART_STM32NETXTELNET_LOGICALCONNECTION_HPP
 
 #include "Loggable.hpp"
+#include "Nameable.hpp"
 
 namespace Stm32NetXTelnet {
     class Server;
