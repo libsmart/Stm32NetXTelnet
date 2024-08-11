@@ -18,6 +18,7 @@ void LogicalConnectionMicrorl::flush() {
 int LogicalConnectionMicrorl::microrlOutput(microrl *mrl, const char *str) {
     log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
             ->println("Stm32NetXTelnet::LogicalConnection::microrlOutput()");
+    // if(cmd != nullptr) return 1;
     write(str);
     return 0;
 }
@@ -31,7 +32,6 @@ int LogicalConnectionMicrorl::microrlExec(microrl *mrl, int argc, const char *co
         Logger.printf("{%s} ", argv[i]);
     }
 
-    Stm32GcodeRunner::AbstractCommand *cmd{};
     auto parserRet = Stm32GcodeRunner::parser->parseArgcArgv(cmd, argc, argv);
 
     if (parserRet == Stm32GcodeRunner::Parser::parserReturn::OK) {
@@ -55,8 +55,9 @@ int LogicalConnectionMicrorl::microrlExec(microrl *mrl, int argc, const char *co
             }
         });
 
-        cmdCtx->registerOnCmdEndFunction([cmdCtx]() {
+        cmdCtx->registerOnCmdEndFunction([cmdCtx, this]() {
             // Debugger_log(DBG, "onCmdEndFn()");
+            cmd = nullptr;
             Stm32GcodeRunner::worker->deleteCommandContext(cmdCtx);
         });
 
@@ -101,10 +102,25 @@ void LogicalConnectionMicrorl::setup() {
                                 &LogicalConnection::microrlSigint>);
 #endif
 
+    microrl_set_prompt(&mrl, (char *)"");
+
+
+    println();
+    print(FIRMWARE_NAME);
+    print(F(" v"));
+    print(FIRMWARE_VERSION);
+    print(F(" "));
+    println(FIRMWARE_COPY);
+    flush();
+    delay(500);
+    print(F("OK"));
+    flush();
+
     microrl_processing_input(&mrl, "\n", 1);
 }
 
 void LogicalConnectionMicrorl::loop() {
+    if(cmd != nullptr) return;
     while (available() > 0) {
         auto ch = read();
         auto ret = microrl_processing_input(&mrl, &ch, 1);

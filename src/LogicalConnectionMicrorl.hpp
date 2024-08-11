@@ -7,6 +7,7 @@
 #define LIBSMART_STM32NETXTELNET_LOGICALCONNECTIONMICRORL_HPP
 
 #include <microrl.h>
+#include "AbstractCommand.hpp"
 #include "Loggable.hpp"
 #include "Nameable.hpp"
 #include "StreamRxTx.hpp"
@@ -64,6 +65,7 @@ namespace Stm32NetXTelnet {
 
     private:
         microrl_t mrl{};
+        Stm32GcodeRunner::AbstractCommand *cmd{};
     };
 }
 
