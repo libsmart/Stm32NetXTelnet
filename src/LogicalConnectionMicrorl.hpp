@@ -66,6 +66,8 @@ namespace Stm32NetXTelnet {
     private:
         microrl_t mrl{};
         Stm32GcodeRunner::AbstractCommand *cmd{};
+        uint8_t iac = 0;
+        uint8_t iacCmd = 0;
     };
 }
 

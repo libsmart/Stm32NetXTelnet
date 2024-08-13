@@ -102,7 +102,7 @@ void LogicalConnectionMicrorl::setup() {
                                 &LogicalConnection::microrlSigint>);
 #endif
 
-    microrl_set_prompt(&mrl, (char *)"");
+    microrl_set_prompt(&mrl, (char *) "");
 
 
     println();
@@ -120,13 +120,57 @@ void LogicalConnectionMicrorl::setup() {
 }
 
 void LogicalConnectionMicrorl::loop() {
-    if(cmd != nullptr) return;
+    if (cmd != nullptr) return;
     while (available() > 0) {
         auto ch = read();
-        auto ret = microrl_processing_input(&mrl, &ch, 1);
-        if (ret != microrlOK) {
-            log(Stm32ItmLogger::LoggerInterface::Severity::ERROR)
-                    ->printf("microrl_processing_input() = 0x%02x\r\n", ret);
+
+        if (iac == 0 && ch == 0xff) {
+            // Enable IAC mode
+            iac++;
+            continue;
+        }
+
+        if (iac == 1 && ch == 0xff) {
+            // Second IAC marks a real 0xff byte
+            iac = 0;
+        }
+
+        if (iac > 0) {
+
+            // 1 byte commands
+            if (iac == 1 && ch >= 0xf0 && ch <= 0xf9) {
+                iacCmd = ch;
+                iac = 0;
+                iacCmd = 0;
+            }
+
+            // 2 byte commands
+            if (iac == 1 && ch >= 0xfb && ch <= 0xfe) {
+                iacCmd = ch;
+                iac++;
+            }
+            if(iac == 2 && iacCmd >= 0xfb && iacCmd <= 0xfe ) {
+                iac = 0;
+                iacCmd = 0;
+            }
+
+            // multi byte commands
+            if (iac == 1 && ch == 0xfa) {
+                iacCmd = ch;
+                iac++;
+            }
+            // multi byte commands end
+            if (iac > 2 && ch == 0xf0) {
+                iac = 0;
+                iacCmd = 0;
+            }
+        } else {
+            // Send character to microrl, if not in IAC mode
+            auto ret = microrl_processing_input(&mrl, &ch, 1);
+            if (ret != microrlOK) {
+                log(Stm32ItmLogger::LoggerInterface::Severity::ERROR)
+                        ->printf("microrl_processing_input() = 0x%02x\r\n", ret);
+            }
         }
     }
 }
