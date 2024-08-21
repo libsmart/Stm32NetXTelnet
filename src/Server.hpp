@@ -6,7 +6,7 @@
 #ifndef LIBSMART_STM32NETXTELNET_SERVER_HPP
 #define LIBSMART_STM32NETXTELNET_SERVER_HPP
 
-#include "globals.hpp"
+// #include "globals.hpp"
 #include "Loggable.hpp"
 #include "Nameable.hpp"
 #include "nx_api.h"
@@ -73,6 +73,8 @@ namespace Stm32NetXTelnet {
 
 
         virtual void loop();
+
+        logicalConnection_t *getLogicalConnection(UINT logical_connection);
 
     private:
         inline static Server *self{};

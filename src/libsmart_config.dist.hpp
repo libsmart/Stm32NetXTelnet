@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+#ifndef LIBSMART_STM32NETXTELNET_LIBSMART_CONFIG_DIST_HPP
+#define LIBSMART_STM32NETXTELNET_LIBSMART_CONFIG_DIST_HPP
+
 #define LIBSMART_STM32NETXTELNET
 
 /**
@@ -21,3 +24,5 @@
  * Size of the tx buffer per telnet logicalConnection
  */
 #define LIBSMART_STM32NETXTELNET_BUFFER_SIZE_TX 256
+
+#endif

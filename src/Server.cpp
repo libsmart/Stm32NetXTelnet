@@ -251,3 +251,7 @@ void Stm32NetXTelnet::Server::loop() {
         }
     }
 }
+
+Stm32NetXTelnet::Server::logicalConnection_t * Stm32NetXTelnet::Server::getLogicalConnection(UINT logical_connection) {
+    return logicalConnection[logical_connection];
+}
