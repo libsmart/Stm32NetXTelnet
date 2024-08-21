@@ -43,27 +43,34 @@ namespace Stm32NetXTelnet {
     class Server;
 
     class LogicalConnectionMicrorl : public Stm32Common::Nameable, public Stm32ItmLogger::Loggable,
-                              public Stm32Common::StreamRxTx<
-                                  LIBSMART_STM32NETXTELNET_BUFFER_SIZE_RX,
-                                  LIBSMART_STM32NETXTELNET_BUFFER_SIZE_TX> {
+                                     public Stm32Common::StreamRxTx<
+                                         LIBSMART_STM32NETXTELNET_BUFFER_SIZE_RX,
+                                         LIBSMART_STM32NETXTELNET_BUFFER_SIZE_TX> {
     public:
         friend Server;
 
+        LogicalConnectionMicrorl();
+
+        ~LogicalConnectionMicrorl() override;
+
         void flush() override;
+
+        void connectionEnd();
 
         int microrlOutput(microrl *mrl, const char *str);
 
         int microrlExec(microrl *mrl, int argc, const char *const *argv);
 
-        char **microrlComplete(microrl *mrl, int argc, const char *const *argv);
+        char **microrlComplete(microrl *mrl, int argc, const char *const *argv) { return nullptr; }
 
-        void microrlSigint(microrl *mrl);
+        void microrlSigint(microrl *mrl) { ; }
 
         virtual void setup();
 
         virtual void loop();
 
     private:
+        bool isConnectionActive = false;
         microrl_t mrl{};
         Stm32GcodeRunner::AbstractCommand *cmd{};
         uint8_t iac = 0;

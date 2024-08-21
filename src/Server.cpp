@@ -104,9 +104,10 @@ void Stm32NetXTelnet::Server::connection_end(NX_TELNET_SERVER_STRUCT *telnet_ser
             ->println("Stm32NetXTelnet::Server::connection_end()");
 
     if (self->logicalConnection[logical_connection] != nullptr) {
-        self->logicalConnection[logical_connection]->flush();
-        delete self->logicalConnection[logical_connection];
-        self->logicalConnection[logical_connection] == nullptr;
+        self->logicalConnection[logical_connection]->connectionEnd();
+        // self->logicalConnection[logical_connection]->flush();
+        // delete self->logicalConnection[logical_connection];
+        // self->logicalConnection[logical_connection] == nullptr;
     }
 }
 
@@ -230,7 +231,12 @@ void Stm32NetXTelnet::Server::loop() {
     // Call the loop() function of the connections
     for (size_t i = 0; i < std::size(logicalConnection); i++) {
         if (logicalConnection[i] != nullptr) {
-            logicalConnection[i]->loop();
+            if(logicalConnection[i]->isConnectionActive) {
+                logicalConnection[i]->loop();
+            } else {
+                delete logicalConnection[i];
+                logicalConnection[i]=nullptr;
+            }
         }
     }
 
@@ -240,7 +246,7 @@ void Stm32NetXTelnet::Server::loop() {
 
     // check, if there are bytes to write
     for (size_t i = 0; i < std::size(logicalConnection); i++) {
-        if (logicalConnection[i] != nullptr) {
+        if (logicalConnection[i] != nullptr && logicalConnection[i]->getTxBuffer() != nullptr) {
             if (logicalConnection[i]->getTxBuffer()->available() > 0) {
                 auto szBuffer = logicalConnection[i]->getTxBuffer()->available();
                 auto ret = bufferSend(i, (void *) logicalConnection[i]->getTxBuffer()->getReadPointer(), szBuffer, 100);

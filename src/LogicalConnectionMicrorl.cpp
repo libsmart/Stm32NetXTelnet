@@ -11,15 +11,38 @@
 
 using namespace Stm32NetXTelnet;
 
+LogicalConnectionMicrorl::LogicalConnectionMicrorl() {
+    isConnectionActive = true;
+}
+
+LogicalConnectionMicrorl::~LogicalConnectionMicrorl() {
+    getRxBuffer()->clear();
+    getTxBuffer()->clear();
+    std::memset(&mrl, 0, sizeof(mrl));
+}
+
 void LogicalConnectionMicrorl::flush() {
     loop();
 }
 
-int LogicalConnectionMicrorl::microrlOutput(microrl *mrl, const char *str) {
+void LogicalConnectionMicrorl::connectionEnd() {
     log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
+        ->println("Stm32NetXTelnet::LogicalConnection::connectionEnd()");
+
+    isConnectionActive = false;
+    getRxBuffer()->clear();
+    getTxBuffer()->clear();
+    if(cmd != nullptr) {
+        auto cmdCtx = cmd->getCommandContext();
+        Stm32GcodeRunner::WorkerDynamic::terminateCommandContext(cmdCtx);
+    }
+}
+
+int LogicalConnectionMicrorl::microrlOutput(microrl *mrl, const char *str) {
+    log(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
             ->println("Stm32NetXTelnet::LogicalConnection::microrlOutput()");
     // if(cmd != nullptr) return 1;
-    write(str);
+    StreamRxTx::write(str);
     return 0;
 }
 
