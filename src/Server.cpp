@@ -9,12 +9,9 @@
 #include "StreamRxTx.hpp"
 
 UINT Stm32NetXTelnet::Server::create(CHAR *server_name, NX_IP *ip_ptr, void *stack_ptr, ULONG stack_size,
-                                     void (*new_connection)(NX_TELNET_SERVER_STRUCT *telnet_server_ptr,
-                                                            UINT logical_connection),
-                                     void (*receive_data)(NX_TELNET_SERVER_STRUCT *telnet_server_ptr,
-                                                          UINT logical_connection, NX_PACKET *packet_ptr),
-                                     void (*connection_end)(NX_TELNET_SERVER_STRUCT *telnet_server_ptr,
-                                                            UINT logical_connection)) {
+                                     new_connection_cb *new_connection,
+                                     receive_data_cb *receive_data,
+                                     connection_end_cb *connection_end) {
     log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
             ->println("Stm32NetXTelnet::Server::create()");
 
@@ -42,9 +39,9 @@ UINT Stm32NetXTelnet::Server::create(CHAR *server_name, NX_IP *ip_ptr, void *sta
         ip_ptr,
         stack_ptr,
         stack_size,
-        new_connection,
-        receive_data,
-        connection_end
+        bounce<Server, decltype(&Server::new_connection), &Server::new_connection, UINT>,
+        bounce<Server, decltype(&Server::receive_data), &Server::receive_data, UINT, NX_PACKET *>,
+        bounce<Server, decltype(&Server::connection_end), &Server::connection_end, UINT>
     );
 }
 
@@ -52,24 +49,16 @@ void Stm32NetXTelnet::Server::new_connection(NX_TELNET_SERVER_STRUCT *telnet_ser
     Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
             ->println("Stm32NetXTelnet::Server::new_connection()");
 
-    Stm32ItmLogger::logger.printf("new logical_connection %d\r\n", logical_connection);
-    if (self->logicalConnection[logical_connection] != nullptr) {
-        Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::ERROR)
-                ->printf("slot self->logicalConnection[%d] not ready\r\n", logical_connection);
-        self->logicalConnection[logical_connection]->flush();
-        self->disconnect(logical_connection);
-        delete self->logicalConnection[logical_connection];
-        self->logicalConnection[logical_connection] == nullptr;
-        return;
+    LIBSMART_UNUSED(telnet_server_ptr);
+
+    auto session = getSessionManager()->getNewSession(logical_connection);
+    if (session != nullptr) {
+        char name[25]{};
+        snprintf(name, sizeof(name), "Telnet Session %d", logical_connection);
+        session->setName(name);
+        session->setLogger(getLogger());
+        session->setup();
     }
-
-    self->logicalConnection[logical_connection] = new logicalConnection_t;
-    char name[25]{};
-    snprintf(name, sizeof(name), "Telnet Session %d", logical_connection);
-
-    self->logicalConnection[logical_connection]->setName(name);
-    self->logicalConnection[logical_connection]->setLogger(self->getLogger());
-    self->logicalConnection[logical_connection]->setup();
 }
 
 void Stm32NetXTelnet::Server::receive_data(NX_TELNET_SERVER_STRUCT *telnet_server_ptr, UINT logical_connection,
@@ -77,25 +66,20 @@ void Stm32NetXTelnet::Server::receive_data(NX_TELNET_SERVER_STRUCT *telnet_serve
     // Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
     // ->println("Stm32NetXTelnet::Server::receive_data()");
 
-    if(self == nullptr) {
-        nx_packet_release(packet_ptr);
-        return;
-    }
+    LIBSMART_UNUSED(telnet_server_ptr);
 
-    auto *conn = self->logicalConnection[logical_connection];
-
-    // static char buffer[ETH_MAX_PAYLOAD];
-    // std::memset(buffer, 0, sizeof(buffer));
-    ULONG length = 0;
-    ULONG bytes_copied = 0;
-    nx_packet_length_get(packet_ptr, &length);
-    if (length <= conn->getRxBuffer()->availableForWrite()) {
-        auto ret = nx_packet_data_retrieve(packet_ptr, conn->getRxBuffer()->getWritePointer(), &bytes_copied);
-        if (ret == NX_SUCCESS) {
-            conn->getRxBuffer()->setWrittenBytes(bytes_copied);
+    auto session = getSessionManager()->getSessionById(logical_connection);
+    if(session != nullptr) {
+        ULONG length = 0;
+        ULONG bytes_copied = 0;
+        nx_packet_length_get(packet_ptr, &length);
+        if (length <= session->getRxBuffer()->availableForWrite()) {
+            auto ret = nx_packet_data_retrieve(packet_ptr, session->getRxBuffer()->getWritePointer(), &bytes_copied);
+            if (ret == NX_SUCCESS) {
+                session->getRxBuffer()->setWrittenBytes(bytes_copied);
+            }
         }
     }
-
     nx_packet_release(packet_ptr);
 }
 
@@ -103,17 +87,21 @@ void Stm32NetXTelnet::Server::connection_end(NX_TELNET_SERVER_STRUCT *telnet_ser
     Stm32ItmLogger::logger.setSeverity(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
             ->println("Stm32NetXTelnet::Server::connection_end()");
 
-    if (self->logicalConnection[logical_connection] != nullptr) {
-        self->logicalConnection[logical_connection]->connectionEnd();
-        // self->logicalConnection[logical_connection]->flush();
-        // delete self->logicalConnection[logical_connection];
-        // self->logicalConnection[logical_connection] == nullptr;
+    LIBSMART_UNUSED(telnet_server_ptr);
+
+    auto session = getSessionManager()->getNewSession(logical_connection);
+    if (session != nullptr) {
+        session->end();
+        getSessionManager()->removeSession(session);
     }
 }
 
 UINT Stm32NetXTelnet::Server::del() {
     log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
             ->println("Stm32NetXTelnet::Server::del()");
+
+
+    getSessionManager()->end();
 
     // https://github.com/eclipse-threadx/rtos-docs/blob/main/rtos-docs/netx-duo/netx-duo-telnet/chapter3.md#nx_telnet_server_delete
     const auto ret = nx_telnet_server_delete(this);
@@ -127,6 +115,9 @@ UINT Stm32NetXTelnet::Server::del() {
 UINT Stm32NetXTelnet::Server::disconnect(UINT logical_connection) {
     log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
             ->println("Stm32NetXTelnet::Server::disconnect()");
+
+
+    getSessionManager()->removeSession(getSessionManager()->getSessionById(logical_connection));
 
     // https://github.com/eclipse-threadx/rtos-docs/blob/main/rtos-docs/netx-duo/netx-duo-telnet/chapter3.md#nx_telnet_server_disconnect
     const auto ret = nx_telnet_server_disconnect(this, logical_connection);
@@ -152,7 +143,7 @@ UINT Stm32NetXTelnet::Server::getOpenConnectionCount(UINT &connection_count) {
 
 UINT Stm32NetXTelnet::Server::packetSend(UINT logical_connection, NX_PACKET *packet_ptr, ULONG wait_option) {
     // log(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
-            // ->println("Stm32NetXTelnet::Server::packetSend()");
+    // ->println("Stm32NetXTelnet::Server::packetSend()");
 
     // https://github.com/eclipse-threadx/rtos-docs/blob/main/rtos-docs/netx-duo/netx-duo-telnet/chapter3.md#nx_telnet_server_packet_send
     const auto ret = nx_telnet_server_packet_send(this, logical_connection, packet_ptr, wait_option);
@@ -211,12 +202,15 @@ UINT Stm32NetXTelnet::Server::start() {
         log(Stm32ItmLogger::LoggerInterface::Severity::ERROR)
                 ->printf("nx_telnet_server_start() = 0x%02x\r\n", ret);
     }
+    getSessionManager()->setup();
     return ret;
 }
 
 UINT Stm32NetXTelnet::Server::stop() {
     log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
             ->println("Stm32NetXTelnet::Server::stop()");
+
+    getSessionManager()->end();
 
     // https://github.com/eclipse-threadx/rtos-docs/blob/main/rtos-docs/netx-duo/netx-duo-telnet/chapter3.md#nx_telnet_server_stop
     const auto ret = nx_telnet_server_stop(this);
@@ -229,35 +223,29 @@ UINT Stm32NetXTelnet::Server::stop() {
 
 void Stm32NetXTelnet::Server::loop() {
     // Call the loop() function of the connections
-    for (size_t i = 0; i < std::size(logicalConnection); i++) {
-        if (logicalConnection[i] != nullptr) {
-            if(logicalConnection[i]->isConnectionActive) {
-                logicalConnection[i]->loop();
-            } else {
-                delete logicalConnection[i];
-                logicalConnection[i]=nullptr;
-            }
-        }
-    }
+
+    getSessionManager()->loop();
 
     NX_PACKET *packet{};
     // NX_PACKET_POOL *packetPool = this->nx_telnet_server_packet_pool_ptr;
     NX_PACKET_POOL *packetPool = Stm32NetX::NX->getPacketPool();
 
     // check, if there are bytes to write
-    for (size_t i = 0; i < std::size(logicalConnection); i++) {
-        if (logicalConnection[i] != nullptr && logicalConnection[i]->getTxBuffer() != nullptr) {
-            if (logicalConnection[i]->getTxBuffer()->available() > 0) {
-                auto szBuffer = logicalConnection[i]->getTxBuffer()->available();
-                auto ret = bufferSend(i, (void *) logicalConnection[i]->getTxBuffer()->getReadPointer(), szBuffer, 100);
-                if (ret == NX_SUCCESS) {
-                    logicalConnection[i]->getTxBuffer()->remove(szBuffer);
-                }
+    auto session = getSessionManager()->getFirstSession();
+    while (session != nullptr) {
+        if (session->getTxBuffer()->available() > 0) {
+            auto szBuffer = session->getTxBuffer()->available();
+            auto ret = bufferSend(session->getId(),
+                (void *) session->getTxBuffer()->getReadPointer(), szBuffer, 100);
+            if (ret == NX_SUCCESS) {
+                session->getTxBuffer()->remove(szBuffer);
             }
         }
+        session = getSessionManager()->getNextSession(session);
     }
 }
 
-Stm32NetXTelnet::Server::logicalConnection_t * Stm32NetXTelnet::Server::getLogicalConnection(UINT logical_connection) {
-    return logicalConnection[logical_connection];
+void Stm32NetXTelnet::Server::end() {
+    stop();
 }
+

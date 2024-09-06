@@ -7,42 +7,18 @@
 #define LIBSMART_STM32NETXTELNET_LOGICALCONNECTIONMICRORL_HPP
 
 #include <microrl.h>
+#include <StreamSession/StreamSessionInterface.hpp>
 #include "AbstractCommand.hpp"
 #include "Loggable.hpp"
 #include "Nameable.hpp"
 #include "StreamRxTx.hpp"
 
 namespace Stm32NetXTelnet {
-    /**
-     * @brief Bounce Function
-     *
-     * This template function acts as a bounce function to call a member function (Method) on an object (T) passed as a
-     * pointer using the input thread_input. It forwards any additional parameters to the member function call.
-     *
-     * @tparam T The class type of the object on which the member function will be called
-     * @tparam Method The type of the member function
-     * @tparam m Pointer to the member function
-     * @tparam Params The types of additional parameters to forward to the member function call
-     *
-     * @param thread_input The integral value representing the pointer to the object on which the member function will be called
-     * @param params The additional parameters to be forwarded to the member function
-     *
-     * @return The return value of the member function call
-     *
-     * @note The caller is responsible for ensuring that thread_input represents a valid pointer to an object of type T
-     * and the member function pointed to by m is of correct signature and can be called with the provided parameters.
-     */
-    template<class T, class Method, Method m, class... Params>
-    static auto bounce(microrl *mrl, Params... params) ->
-        decltype(((*reinterpret_cast<T *>(mrl->userdata_ptr)).*m)(mrl, params...)) {
-        assert_param(mrl != nullptr);
-        assert_param(mrl->userdata_ptr != nullptr);
-        return ((*reinterpret_cast<T *>(mrl->userdata_ptr)).*m)(mrl, params...);
-    }
 
     class Server;
 
-    class LogicalConnectionMicrorl : public Stm32Common::Nameable, public Stm32ItmLogger::Loggable,
+    class LogicalConnectionMicrorl : protected microrl_t,
+                                     public Stm32Common::StreamSession::StreamSessionInterface,
                                      public Stm32Common::StreamRxTx<
                                          LIBSMART_STM32NETXTELNET_BUFFER_SIZE_RX,
                                          LIBSMART_STM32NETXTELNET_BUFFER_SIZE_TX> {
@@ -53,9 +29,16 @@ namespace Stm32NetXTelnet {
 
         ~LogicalConnectionMicrorl() override;
 
+        /**
+         * @brief Flush the current connection buffer
+         *
+         * This method triggers the `loop()` function to process any pending tasks or data
+         * in the buffer associated with a LogicalConnectionMicrorl instance.
+         *
+         * @note This method is typically used to ensure all data is processed and the
+         * connection state is up to date.
+         */
         void flush() override;
-
-        void connectionEnd();
 
         int microrlOutput(microrl *mrl, const char *str);
 
@@ -65,16 +48,46 @@ namespace Stm32NetXTelnet {
 
         void microrlSigint(microrl *mrl) { ; }
 
-        virtual void setup();
+        void setup() override;
 
-        virtual void loop();
+        void loop() override;
+
+        void end() override;
 
     private:
-        bool isConnectionActive = false;
-        microrl_t mrl{};
+        // bool isConnectionActive = false;
         Stm32GcodeRunner::AbstractCommand *cmd{};
         uint8_t iac = 0;
         uint8_t iacCmd = 0;
+
+    protected:
+        template<class T, class Method, Method m, class... Params>
+        /**
+         * @brief Bounce Function
+         *
+         * This template function calls a member function (Method) on an object (T) passed through a microrl pointer.
+         * It verifies that the given microrl pointer and the session cast from it are valid before invoking the member function.
+         *
+         * @tparam T The class type of the object on which the member function will be called
+         * @tparam Method The type of the member function
+         * @tparam m Pointer to the member function
+         * @tparam Params The types of additional parameters to forward to the member function call
+         *
+         * @param mrl A pointer to a microrl object representing the session
+         * @param params The additional parameters to be forwarded to the member function
+         *
+         * @return The return value of the member function call
+         *
+         * @note The caller is responsible for ensuring that the microrl pointer represents a valid session and the member function
+         *       pointed to by m is of the correct signature and can be called with the provided parameters.
+         */
+        static auto bounce(microrl *mrl, Params... params) ->
+            decltype(((*static_cast<T *>(mrl)).*m)(mrl, params...)) {
+            assert_param(mrl != nullptr);
+            T *session = static_cast<T *>(mrl);
+            assert_param(session != nullptr);
+            return ((*static_cast<T *>(session)).*m)(mrl, params...);
+        }
     };
 }
 

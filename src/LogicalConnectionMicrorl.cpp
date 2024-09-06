@@ -11,38 +11,25 @@
 
 using namespace Stm32NetXTelnet;
 
-LogicalConnectionMicrorl::LogicalConnectionMicrorl() {
-    isConnectionActive = true;
+LogicalConnectionMicrorl::LogicalConnectionMicrorl() : microrl() {
+    // isConnectionActive = true;
 }
 
 LogicalConnectionMicrorl::~LogicalConnectionMicrorl() {
     getRxBuffer()->clear();
     getTxBuffer()->clear();
-    std::memset(&mrl, 0, sizeof(mrl));
+    microrl_t{};
 }
 
 void LogicalConnectionMicrorl::flush() {
     loop();
 }
 
-void LogicalConnectionMicrorl::connectionEnd() {
-    log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
-        ->println("Stm32NetXTelnet::LogicalConnection::connectionEnd()");
-
-    isConnectionActive = false;
-    getRxBuffer()->clear();
-    getTxBuffer()->clear();
-    if(cmd != nullptr) {
-        auto cmdCtx = cmd->getCommandContext();
-        Stm32GcodeRunner::WorkerDynamic::terminateCommandContext(cmdCtx);
-    }
-}
-
 int LogicalConnectionMicrorl::microrlOutput(microrl *mrl, const char *str) {
     log(Stm32ItmLogger::LoggerInterface::Severity::DEBUGGING)
             ->println("Stm32NetXTelnet::LogicalConnection::microrlOutput()");
-    // if(cmd != nullptr) return 1;
-    StreamRxTx::write(str);
+
+    write(str);
     return 0;
 }
 
@@ -101,7 +88,7 @@ void LogicalConnectionMicrorl::setup() {
             ->println("Stm32NetXTelnet::LogicalConnection::setup()");
 
     /* Initialize library with microrl instance and print and execute callbacks */
-    auto ret = microrl_init(&mrl,
+    auto ret = microrl_init(this,
                             bounce<LogicalConnectionMicrorl, decltype(&LogicalConnectionMicrorl::microrlOutput),
                                 &LogicalConnectionMicrorl::microrlOutput, const char *>,
                             bounce<LogicalConnectionMicrorl, decltype(&LogicalConnectionMicrorl::microrlExec),
@@ -111,21 +98,21 @@ void LogicalConnectionMicrorl::setup() {
         log(Stm32ItmLogger::LoggerInterface::Severity::ERROR)
                 ->printf("microrl_init() = 0x%02x\r\n", ret);
     }
-    mrl.userdata_ptr = this;
+    // userdata_ptr = this;
 
 #if MICRORL_CFG_USE_COMPLETE
     /* Set callback for auto-completion */
-    microrl_set_complete_callback(&mrl, bounce<LogicalConnection, decltype(&LogicalConnection::microrlComplete),
+    microrl_set_complete_callback(this, bounce<LogicalConnection, decltype(&LogicalConnection::microrlComplete),
                                 &LogicalConnection::microrlComplete, int, const char *const *>);
 #endif
 
 #if MICRORL_CFG_USE_CTRL_C
     /* Set callback for Ctrl+C handling */
-    microrl_set_sigint_callback(&mrl, bounce<LogicalConnection, decltype(&LogicalConnection::microrlSigint),
+    microrl_set_sigint_callback(this, bounce<LogicalConnection, decltype(&LogicalConnection::microrlSigint),
                                 &LogicalConnection::microrlSigint>);
 #endif
 
-    microrl_set_prompt(&mrl, (char *) "");
+    microrl_set_prompt(this, (char *) "");
 
 
     println();
@@ -139,7 +126,7 @@ void LogicalConnectionMicrorl::setup() {
     print(F("OK"));
     flush();
 
-    microrl_processing_input(&mrl, "\n", 1);
+    microrl_processing_input(this, "\n", 1);
 }
 
 void LogicalConnectionMicrorl::loop() {
@@ -159,7 +146,6 @@ void LogicalConnectionMicrorl::loop() {
         }
 
         if (iac > 0) {
-
             // 1 byte commands
             if (iac == 1 && ch >= 0xf0 && ch <= 0xf9) {
                 iacCmd = ch;
@@ -172,7 +158,7 @@ void LogicalConnectionMicrorl::loop() {
                 iacCmd = ch;
                 iac++;
             }
-            if(iac == 2 && iacCmd >= 0xfb && iacCmd <= 0xfe ) {
+            if (iac == 2 && iacCmd >= 0xfb && iacCmd <= 0xfe) {
                 iac = 0;
                 iacCmd = 0;
             }
@@ -189,11 +175,30 @@ void LogicalConnectionMicrorl::loop() {
             }
         } else {
             // Send character to microrl, if not in IAC mode
-            auto ret = microrl_processing_input(&mrl, &ch, 1);
+            auto ret = microrl_processing_input(this, &ch, 1);
             if (ret != microrlOK) {
                 log(Stm32ItmLogger::LoggerInterface::Severity::ERROR)
                         ->printf("microrl_processing_input() = 0x%02x\r\n", ret);
             }
         }
     }
+}
+
+void LogicalConnectionMicrorl::end() {
+    log(Stm32ItmLogger::LoggerInterface::Severity::INFORMATIONAL)
+        ->println("Stm32NetXTelnet::LogicalConnection::connectionEnd()");
+
+    // isConnectionActive = false;
+    getRxBuffer()->clear();
+    getTxBuffer()->clear();
+    if (cmd != nullptr) {
+        auto cmdCtx = cmd->getCommandContext();
+        Stm32GcodeRunner::WorkerDynamic::terminateCommandContext(cmdCtx);
+    }
+
+    // isConnectionActive = false;
+    microrl_t{};
+    cmd = nullptr;
+    iac = 0;
+    iacCmd = 0;
 }
